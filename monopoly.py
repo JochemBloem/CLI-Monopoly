@@ -327,10 +327,10 @@ class Player:
 
                     displayList(props[0], props[1], "Your properties:", player.name + "'s properties:")
                     
-                    has = self.getTradingItems(True, len(self.properties) + 1, self)
+                    has = self.getTradingItems(True, len(self.properties) + 1, self, player)
                     if has == "quit":
                         return False
-                    wants = self.getTradingItems(False, len(player.properties) + 1, player)
+                    wants = self.getTradingItems(False, len(player.properties) + 1, player, player)
                     if wants == "quit":
                         return False
 
@@ -385,11 +385,11 @@ class Player:
             print "That player could not be found. Try again or type .quit to stop trading."
         return False
 
-    def getTradingItems(self, has, maxProperties, who):
+    def getTradingItems(self, has, maxProperties, who, other):
         clearSpace(2)
         print "Type .next to go to the next player or .quit to quit" if has else "Type .next to review the trade deal or .quit to quit"
         clearSpace(1)
-        text = "Add an item to " + ("YOUR" if has else "THEIR") + " side of the deal: "
+        text = "Add an item to " + ("get from " if not who == self else "give to ") + other.name + ": "
         item = ""
         items = []
         while not item in [".next", ".quit"]:
