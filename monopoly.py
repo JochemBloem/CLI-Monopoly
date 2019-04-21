@@ -81,6 +81,9 @@ class Game:
         while len(self.players) > 1:
             for i in range(len(self.players)):
                 player = self.players[i]
+                player.doublesInArow = 0
+                player.double = False
+                player.throw = 0
                 if player.type == "player":
                     #this is a human player, and should therefore be able to make their own decisions
                     print player.name + ", it's your turn!"
@@ -99,13 +102,35 @@ class Game:
                         ".leaderboard": self.leaderboard
                     }
                     while playermove == ".help" or not success:
+                        if playermove == ".end":
+                            if player.throw == 0:
+                                print "You have to throw the dice at least once every turn!"
+                                playermove = ""
+                                continue
+                            if player.double:
+                                print "You cannot end your turn, you have to throw the dice again. Type .move!"
+                                playermove = ""
+                                continue
+                            else:
+                                success = True
+                                continue
                         playermove = getUserInput("Make a move: ", str)
                         try:
-                            success = move_options[playermove.lower()]()
+                            move = playermove.lower()
+                            move_options[move]
+                            if move == ".move" and player.throw > 0 and not player.double:
+                                clearSpace(1)
+                                print "You may not throw the dice again, as you have not thrown doubles last throw!"
+                                clearSpace(1)
+                                continue
+                            if move == ".build" and player.throw > 0:
+                                clearSpace(1)
+                                print "You may not build on any properties right now, \n" + indent() + "you can only build before throwing the dice."
+                                clearSpace(1)
+                                continue
+                            move_options[move]()
                         except KeyError:
                             print "That is not a valid move. Press .help for all options."
-
-                    raw_input("Press enter to end your turn! ")
 
                 else:
                     #this is a bot and their actions are automated
@@ -138,6 +163,7 @@ class Player:
         self.position = 0
         self.type = playerType
         self.game = game
+        self.throw = 0
 
         self.double = False
         self.doublesInArow = 0
@@ -152,10 +178,24 @@ class Player:
         die2 = rnd.randint(1,6)
         total = die1 + die2
         self.position += total
+        self.throw += 1
 
         who = "You" if self.type == "player" else self.name
-
         print who + " threw a" + ("n " if total in [8, 11] else " ") + str(total) + "! (" + str(die1) + "+" + str(die2) + ")"
+
+        if die1 == die2:
+            clearSpace(1)
+            print "You threw doubles! You must make another move after this.\n" + indent() + "If you throw double three times in a row, you have to go to prison..." if self.type == "player" else ""
+            self.double = True
+            self.doublesInArow += 1
+            if self.doublesInArow == 3:
+                print "You have thrown doubles three times in a row, and you have been arrested! You are now in prison."
+                self.position = 10
+                self.inPrison = True
+            clearSpace(1)
+        else:
+            self.double = False
+            self.doublesInArow = 0
 
         if(self.position >= 40):
             self.position = self.position % 40
@@ -166,6 +206,7 @@ class Player:
         tilename = tile.properties["name"]
 
         print who + " landed on " + tilename
+        time.sleep(SHORT_SLEEP)
 
         #player get more information in the console about their moves
         if self.type == "player":
@@ -445,7 +486,7 @@ class Player:
     def purchase(self, tile):
         tile.purchase(self.index)
         self.money -= tile.properties["price"]
-        print ("You" if self.type == "player" else self.name) + " now own" + (" " if self.type == "player" else "s ") + tile.properties["name"] + " (" + tile.properties["set"] + ")!"
+        print ("You" if self.type == "player" else self.name) + " now own" + (" " if self.type == "player" else "s ") + tile.properties["name"] + " (" + tile.properties["set"] + ")! ($" + str(self.money) + " left)"
         self.properties.append(tile)
         time.sleep(SHORT_SLEEP)
 
@@ -460,6 +501,7 @@ class Player:
         print "You can trade with other players by typing .trade"
         print "You can list all your properties by typing .properties"
         print "You can view the leaderboard by typing .leaderboard"
+        print "You can end your turn by typing .end"
         clearSpace(1)
         return False
 
