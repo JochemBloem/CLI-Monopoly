@@ -7,6 +7,7 @@ import boarddef_standard
 GLOBAL_SPEED = .2
 SHORT_SLEEP = 1 * GLOBAL_SPEED
 LONG_SLEEP = 2 * GLOBAL_SPEED
+SMALL_RELATIVE = 50
 
 class Game:
     def __init__(self):
@@ -164,6 +165,8 @@ class Player:
         tile = self.game.board.getLocation(self.position)
         tilename = tile.properties["name"]
 
+        print who + " landed on " + tilename
+
         #player get more information in the console about their moves
         if self.type == "player":
 
@@ -200,9 +203,19 @@ class Player:
                         print "You cannot afford rent on this property."
                 elif tile.state == "mortgaged":
                     pass
+            elif isinstance(tile, boarddef_standard.Draw):
+                pass
+            elif isinstance(tile, boarddef_standard.Special):
+                if tile.properties["tax"]:
+                    print self.name + " owes the bank $" + str(tile.properties["value"]) + "."
+                    self.money -= tile.properties["value"]
+                    print self.name + " now has $" + str(self.money)
+                elif tile.properties["name"] == "Go to prison":
+                    print self.name + " is now in prison!"
+                    self.position = 10
+                    self.inPrison = True
         #bots are automated
         else:
-            print who + " landed on " + tilename
             time.sleep(SHORT_SLEEP)
             if isinstance(tile, boarddef_standard.Property):
                 owner = self.game.players[tile.owner]
@@ -248,7 +261,7 @@ class Player:
     def build(self):
         ownedSets = self.getOwnedSets()
         for workingSet in ownedSets:
-            if self.game.getAmountInSet(self.index, workingset) == len(ownedSets[workingSet]):
+            if self.game.getAmountInSet(self.index, workingSet) == len(ownedSets[workingSet]):
                 print "You can build on the " + workingSet + " set."
                 return True
         print "You need to have a complete set in order to start building houses. \nType .properties to see your current progress."
@@ -292,7 +305,37 @@ class Player:
                     clearSpace(1)
                     
                     if getUserConfirm("Do you wish to propose this trade deal to " + player.name + "? [y/n] "):
+                        # propose the deal
                         print "Deal proposed"
+                        time.sleep(SHORT_SLEEP)
+                        if player.proposeDeal(self, has, wants):
+                            print player.name + " has accepted the deal."
+                            # proceed with the deal
+                            clearSpace(2)
+                            for prop in has:
+                                if prop.state == "money":
+                                    player.money += prop.value
+                                    self.money -= prop.value                             
+                                else: 
+                                    player.properties.append(prop)
+                                    self.properties.remove(prop)
+                                    print player.name + " gains " + prop.properties["name"]
+                            for prop in wants:
+                                if prop.state == "money":
+                                    self.money += prop.value
+                                    player.money -= prop.value
+                                else: 
+                                    self.properties.append(prop)
+                                    player.properties.remove(prop)
+                                    print self.name + " gains " + prop.properties["name"]
+                            
+                            print player.name + " now has $" + str(self.money)
+                            print self.name + " now has $" + str(player.money)
+                            clearSpace(1)
+
+                        else:
+                            print player.name + " has rejected the deal."
+
                     else:
                         print "The trade deal has been aborted."
                         time.sleep(SHORT_SLEEP)
@@ -322,7 +365,21 @@ class Player:
                 else:
                     # if the item is money, show a popup to ask for how much
                     if item == 1:
-                        pass
+                        correct = False
+                        amount = 0
+                        while not correct:
+                            amount = getUserInput(indent() + "How much? $", int)
+                            if amount <= who.money and amount >= 0:
+                                correct = True
+                            elif amount > who.money: 
+                                print indent() + who.name + " cannot pay more than they currently have! ($" + str(who.money) + ")"
+                            elif amount < 0:
+                                print indent() + "You cannot enter a value below 0!"
+                        
+                        money = boarddef_standard.Property(None)
+                        money.state = "money"
+                        money.value = amount
+                        items.append(money)
                     else:
                         item -= 2 # return the value to the correct property indices
                         desired = who.properties[item]
@@ -335,6 +392,42 @@ class Player:
                 print "Please enter a valid integer. See above list for available properties and their indices."
             clearSpace(1)
 
+    def proposeDeal(self, target, theirs, ours):
+        valuation = 0
+
+        combo = [ours, theirs]
+
+        for i, player in enumerate([self, target]):
+            for prop in combo[i]:
+                valuation += self.evaluate(player, prop, (True if player == target else False), combo[i])
+
+        return valuation > 0
+
+    def evaluate(self, target, prop, positive, restOfDeal):
+        # get a base value (the price of the property, or the amount of money)
+        if prop.state == "money":
+            base = prop.value
+        else: 
+            base = prop.properties["price"]
+
+        # calculate the relative value
+        
+        # gain value for each property of the same set already in possession by the target
+        #   gain a lot of value for this property being the last to complete a set
+        relative = 0
+        if not prop.state == "money":
+            propset = prop.properties["set"]
+            for prop2 in target.properties:
+                if prop2.properties["set"] == propset:
+                    relative += SMALL_RELATIVE
+            
+
+        # return as a positive value if positive == True else return as a negative value
+        value = base + relative
+
+        value *= ( 1 if positive else -1 )
+
+        return value
 
     def getOwnedSets(self):
         ownedSets = {}
@@ -379,7 +472,7 @@ class Player:
         for key in ownedSets:
             print key + ": " + str(len(ownedSets[key])) + "/" + str(self.game.getTotalInSet(key))
             for prop in ownedSets[key]:
-                name = "    " + prop.properties["name"]
+                name = indent() + prop.properties["name"]
                 while len(name) < 35:
                     name += " "
                 houses = "with " + (str(prop.houses) + " houses " if not prop.houses == 5 else "1 hotel ") if prop.properties["set"] not in ["utilities", "railroads"] else ""
@@ -397,6 +490,12 @@ def createSegment(length, text = ""):
         while len(segment) < length:
             segment += " "
         return segment
+
+def indent(amount = 1):
+    string = ""
+    for _ in range(amount):
+        string += "    "
+    return string
 
 def displayList(list1, list2, header1 = "", header2 = ""):
     mostitems = max(len(list1), len(list2))
