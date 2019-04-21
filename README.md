@@ -24,4 +24,4 @@ This is the game of Monopoly in the CLI. Start the game by running monopoly.py. 
 
 - .quit to cancel the trade deal
 - .next to go to the next player, or to review the deal if this is the last player
-- To add a property (or money) to the trade deal, enter the index of the property (as displayed in the list
+- To add a property (or money) to the trade deal, enter the index of the property (as displayed in the list)
