@@ -91,9 +91,9 @@ class Game:
                     move_options = {
                         ".move": player.move,
                         ".build": player.build,
-                        ".set": player.sets,
                         ".bail": player.bail,
                         ".help": player.help,
+                        ".trade": player.trade,
                         ".properties": player.showProperties,
                         ".leaderboard": self.leaderboard
                     }
@@ -184,9 +184,9 @@ class Player:
                     print "You landed on " + tile.properties["name"]
                     print "This property is owned by " + self.game.players[tile.owner].name
                     if tile.properties["set"] == "utilities":
-                        rent = total * (4 if game.getAmountInSet(tile.owner, "utilities") == 1 else 10)
+                        rent = total * (4 if self.game.getAmountInSet(tile.owner, "utilities") == 1 else 10)
                     elif tile.properties["set"] == "railroads":
-                        rent = tile.properties["rent"][game.getAmountInSet(tile.owner, "railroads")]
+                        rent = tile.properties["rent"][self.game.getAmountInSet(tile.owner, "railroads")]
                     else:
                         rent = tile.properties["rent"][tile.houses]
                     print "You owe " + self.game.players[tile.owner].name + " $" + str(rent) + " in rent."
@@ -218,9 +218,9 @@ class Player:
 
                 elif tile.state == "owned":
                     if tile.properties["set"] == "utilities":
-                        rent = total * (4 if game.getAmountInSet(tile.owner, "utilities") == 1 else 10)
+                        rent = total * (4 if self.game.getAmountInSet(tile.owner, "utilities") == 1 else 10)
                     elif tile.properties["set"] == "railroads":
-                        rent = tile.properties["rent"][game.getAmountInSet(tile.owner, "railroads")]
+                        rent = tile.properties["rent"][self.game.getAmountInSet(tile.owner, "railroads")]
                     else:
                         rent = tile.properties["rent"][tile.houses]
                     self.money -= rent
@@ -248,11 +248,93 @@ class Player:
     def build(self):
         ownedSets = self.getOwnedSets()
         for workingSet in ownedSets:
-            if game.getAmountInSet(self.index, workingset) == len(ownedSets[workingSet]):
+            if self.game.getAmountInSet(self.index, workingset) == len(ownedSets[workingSet]):
                 print "You can build on the " + workingSet + " set."
                 return True
         print "You need to have a complete set in order to start building houses. \nType .properties to see your current progress."
         return False
+
+    def trade(self):
+        target = ""
+        while not target == ".quit":
+            target = getUserInput("Who do you want to trade with? ").lower()
+            if target == ".quit":
+                return False
+            for player in self.game.players:
+                if player.name.lower() == target:
+                    clearSpace()
+                    print "You are trading with " + player.name
+
+                    #List all properties of the two trading parties
+                    props = [["Money: (max: $" + str(self.money) + ")"],["Money: (max: $" + str(player.money) + ")"]]
+                    for i, player in enumerate([self, player]):
+                        for prop in player.properties:
+                            props[i].append( prop.properties["name"] + " (" + prop.properties["set"] + ")" )
+
+                    displayList(props[0], props[1], "Your properties:", player.name + "'s properties:")
+                    
+                    has = self.getTradingItems(True, len(self.properties) + 1, self)
+                    if has == "quit":
+                        return False
+                    wants = self.getTradingItems(False, len(player.properties) + 1, player)
+                    if wants == "quit":
+                        return False
+
+                    # review the deal
+                    clearSpace()
+                    props = [[],[]]
+                    for i, workingList in enumerate([has, wants]):
+                        for prop in workingList:
+                            part1 = prop.properties["name"] + " " if not prop.state == "money" else ""
+                            part2 = "(" + prop.properties["set"] + ")" if not prop.state == "money" else "$" + str(prop.value)
+                            props[i].append(part1 + part2)
+                    displayList(props[0], props[1], self.name + " gives to " + player.name + ":", player.name + " gives to " + self.name + ":")
+                    clearSpace(1)
+                    
+                    if getUserConfirm("Do you wish to propose this trade deal to " + player.name + "? [y/n] "):
+                        print "Deal proposed"
+                    else:
+                        print "The trade deal has been aborted."
+                        time.sleep(SHORT_SLEEP)
+
+                    return False
+            print "That player could not be found. Try again or type .quit to stop trading."
+        return False
+
+    def getTradingItems(self, has, maxProperties, who):
+        clearSpace(2)
+        print "Type .next to go to the next player or .quit to quit" if has else "Type .next to review the trade deal or .quit to quit"
+        clearSpace(1)
+        text = "Add an item to " + ("YOUR" if has else "THEIR") + " side of the deal: "
+        item = ""
+        items = []
+        while not item in [".next", ".quit"]:
+            item = getUserInput(text)
+            if item == ".next":
+                return items
+            if item == ".quit":
+                return "quit"
+            try:
+                item = int(item)
+                if item > maxProperties:
+                    print "That value exceeds " + ("your" if has else "their") + " amount of properties. Choose a lower value."
+                    continue
+                else:
+                    # if the item is money, show a popup to ask for how much
+                    if item == 1:
+                        pass
+                    else:
+                        item -= 2 # return the value to the correct property indices
+                        desired = who.properties[item]
+                        if not desired in items:
+                            items.append(desired)
+                            print "Added " + desired.properties["name"] + " to " + ("your" if has else "their") + " side of the trade deal"
+                        else:
+                            print desired.properties["name"] + " is already present in the deal. Choose another property or type .next to " + ("go to their side of the deal" if has else "review the deal")
+            except ValueError:
+                print "Please enter a valid integer. See above list for available properties and their indices."
+            clearSpace(1)
+
 
     def getOwnedSets(self):
         ownedSets = {}
@@ -282,17 +364,10 @@ class Player:
             
         print "You can move your character by typing .move"
         print "You can build on properties by typing .build"
-        print "You can see your sets by typing .set"
+        print "You can trade with other players by typing .trade"
         print "You can list all your properties by typing .properties"
         print "You can view the leaderboard by typing .leaderboard"
         clearSpace(1)
-        return False
-
-    def sets(self):
-        ownedSets = self.getOwnedSets()
-        
-        for key in ownedSets:
-            print key + ": " + str(game.getAmountInSet(self.index, key)) + "/" + str(game.getTotalInSet(key))
         return False
 
     def showProperties(self):
@@ -302,7 +377,7 @@ class Player:
         ownedSets = self.getOwnedSets()
         
         for key in ownedSets:
-            print key + ": " + str(len(ownedSets[key])) + "/" + str(game.getTotalInSet(key))
+            print key + ": " + str(len(ownedSets[key])) + "/" + str(self.game.getTotalInSet(key))
             for prop in ownedSets[key]:
                 name = "    " + prop.properties["name"]
                 while len(name) < 35:
@@ -310,12 +385,34 @@ class Player:
                 houses = "with " + (str(prop.houses) + " houses " if not prop.houses == 5 else "1 hotel ") if prop.properties["set"] not in ["utilities", "railroads"] else ""
                 while len(houses) < 14:
                     houses += " "
-                multiplier = (2 if game.getAmountInSet(self.index, prop.properties["set"]) == game.getTotalInSet(prop.properties["set"]) else 1)
-                rent = "($" + str(prop.properties["rent"][(prop.houses if prop.properties["set"] not in ["utilities", "railroads"] else game.getAmountInSet(self.index, prop.properties["set"]) )] * multiplier) + ")"
+                multiplier = (2 if self.game.getAmountInSet(self.index, prop.properties["set"]) == self.game.getTotalInSet(prop.properties["set"]) else 1)
+                rent = "($" + str(prop.properties["rent"][(prop.houses if prop.properties["set"] not in ["utilities", "railroads"] else self.game.getAmountInSet(self.index, prop.properties["set"]) )] * multiplier) + ")"
                 mortgaged = ("\nMORTGAGED" if prop.state == "mortgaged" else "")
                 print name + houses + rent + mortgaged
         clearSpace(1)
         return False
+
+def createSegment(length, text = ""):
+        segment = text
+        while len(segment) < length:
+            segment += " "
+        return segment
+
+def displayList(list1, list2, header1 = "", header2 = ""):
+    mostitems = max(len(list1), len(list2))
+    line = createSegment(text=header1, length=45) + createSegment(text=header2, length=45)
+    print line
+    clearSpace(1)
+    for i in range(mostitems):
+        line = ""
+        for l in [list1, list2]:
+            try:
+                line += createSegment(45, str(i + 1) + ": " + l[i])
+            except IndexError:
+                line += createSegment(45)
+        print line 
+    clearSpace(1)
+
 
 def getInputType(string):
     switcher = {
@@ -337,7 +434,13 @@ def getUserInput(string, inputtype = str):
         except ValueError:
             print "Please enter a valid "+ getInputType(str(inputtype)) +"!"
 
-def clearSpace(lines):
+def getUserConfirm(string):
+    answer = ""
+    while not answer in ["y", "n"]:
+        answer = getUserInput(string).lower()
+    return answer == "y"
+
+def clearSpace(lines = 20):
     for _ in range(lines):
         print ""
 

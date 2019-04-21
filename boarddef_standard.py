@@ -5,6 +5,7 @@ class Property:
         self.state = "free"
         self.houses = 0
         self.owner = -1
+        self.value = 0
 
     def purchase(self, purchaser):
         self.owner = purchaser
