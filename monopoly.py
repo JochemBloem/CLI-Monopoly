@@ -181,122 +181,125 @@ class Player:
         self.throw += 1
 
         who = "You" if self.type == "player" else self.name
-        print who + " threw a" + ("n " if total in [8, 11] else " ") + str(total) + "! (" + str(die1) + "+" + str(die2) + ")"
+        if not self.inPrison:
+            print who + " threw a" + ("n " if total in [8, 11] else " ") + str(total) + "! (" + str(die1) + "+" + str(die2) + ")"
 
-        if die1 == die2:
-            clearSpace(1)
-            print "You threw doubles! You must make another move after this.\n" + indent() + "If you throw double three times in a row, you have to go to prison..." if self.type == "player" else ""
-            self.double = True
-            self.doublesInArow += 1
-            if self.doublesInArow == 3:
-                print "You have thrown doubles three times in a row, and you have been arrested! You are now in prison."
-                self.position = 10
-                self.inPrison = True
-            clearSpace(1)
-        else:
-            self.double = False
-            self.doublesInArow = 0
-
-        if(self.position >= 40):
-            self.position = self.position % 40
-            self.money += 200
-            print who + " also passed start, and have received $200! (total: $" + str(self.money)
-
-        tile = self.game.board.getLocation(self.position)
-        tilename = tile.properties["name"]
-
-        print who + " landed on " + tilename
-        time.sleep(SHORT_SLEEP)
-
-        #player get more information in the console about their moves
-        if self.type == "player":
-
-            #the tile the player landed on is a Property
-            if isinstance(tile, boarddef_standard.Property):
-                #the Property is still purchaseable
-                owner = self.game.players[tile.owner]
-                if tile.state == "free":
-                    print tile.properties["name"] + " (" + tile.properties["set"] + ") is still purchaseable for $" + str(tile.properties["price"])
-                    confirm = ""
-                    while not confirm in ["y", "n"]:
-                        confirm = getUserInput("Do you wish to purchase this property? [y/n] ").lower()
-
-                    if confirm == "y":
-                        self.purchase(tile)
-                #the Property is owned by another player, and the current player has to pay rent
-                elif tile.state == "owned":
-                    print "You landed on " + tile.properties["name"]
-                    print "This property is owned by " + self.game.players[tile.owner].name
-                    if tile.properties["set"] == "utilities":
-                        rent = total * (4 if self.game.getAmountInSet(tile.owner, "utilities") == 1 else 10)
-                    elif tile.properties["set"] == "railroads":
-                        rent = tile.properties["rent"][self.game.getAmountInSet(tile.owner, "railroads")]
-                    else:
-                        rent = tile.properties["rent"][tile.houses]
-                    print "You owe " + self.game.players[tile.owner].name + " $" + str(rent) + " in rent."
-                    print "    (" + self.game.board.getLocationName(self.position) + " currently has " + str(tile.houses) + " houses)"
-                    time.sleep(SHORT_SLEEP)
-                    self.money -= tile.properties["rent"][tile.houses]
-                    self.game.players[tile.owner].money += tile.properties["rent"][tile.houses]
-                    if self.money > 0:
-                        print "You now have $" + str(self.money)
-                    else:
-                        print "You cannot afford rent on this property."
-                elif tile.state == "mortgaged":
-                    pass
-            elif isinstance(tile, boarddef_standard.Draw):
-                pass
-            elif isinstance(tile, boarddef_standard.Special):
-                if tile.properties["tax"]:
-                    print self.name + " owes the bank $" + str(tile.properties["value"]) + "."
-                    self.money -= tile.properties["value"]
-                    print self.name + " now has $" + str(self.money)
-                elif tile.properties["name"] == "Go to prison":
-                    print self.name + " is now in prison!"
+            if die1 == die2:
+                clearSpace(1)
+                print "You threw doubles! You must make another move after this.\n" + indent() + "If you throw double three times in a row, you have to go to prison..." if self.type == "player" else ""
+                self.double = True
+                self.doublesInArow += 1
+                if self.doublesInArow == 3:
+                    print "You have thrown doubles three times in a row, and you have been arrested! You are now in prison."
                     self.position = 10
                     self.inPrison = True
-        #bots are automated
-        else:
+                clearSpace(1)
+            else:
+                self.double = False
+                self.doublesInArow = 0
+
+            if(self.position >= 40):
+                self.position = self.position % 40
+                self.money += 200
+                print who + " also passed start, and have received $200! (total: $" + str(self.money)
+
+            tile = self.game.board.getLocation(self.position)
+            tilename = tile.properties["name"]
+
+            print who + " landed on " + tilename
             time.sleep(SHORT_SLEEP)
-            if isinstance(tile, boarddef_standard.Property):
-                owner = self.game.players[tile.owner]
 
-                #if this is their own property, do nothing
-                if tile.owner == self.index:
-                    print tilename + " is already " + self.name + "'s property." 
-                    return True
+            #player get more information in the console about their moves
+            if self.type == "player":
 
-                purchaseable = self.money - tile.properties["price"] > self.purchaseThreshold
-                if tile.state == "free" and purchaseable:
-                    self.purchase(tile)
+                #the tile the player landed on is a Property
+                if isinstance(tile, boarddef_standard.Property):
+                    #the Property is still purchaseable
+                    owner = self.game.players[tile.owner]
+                    if tile.state == "free":
+                        print tile.properties["name"] + " (" + tile.properties["set"] + ") is still purchaseable for $" + str(tile.properties["price"])
+                        confirm = ""
+                        while not confirm in ["y", "n"]:
+                            confirm = getUserInput("Do you wish to purchase this property? [y/n] ").lower()
 
-                elif tile.state == "owned":
-                    if tile.properties["set"] == "utilities":
-                        rent = total * (4 if self.game.getAmountInSet(tile.owner, "utilities") == 1 else 10)
-                    elif tile.properties["set"] == "railroads":
-                        rent = tile.properties["rent"][self.game.getAmountInSet(tile.owner, "railroads")]
-                    else:
-                        rent = tile.properties["rent"][tile.houses]
-                    self.money -= rent
-                    owner.money += rent
-                    print who + " paid $" + str(rent) + " to " + owner.name + " (Total: $" + str(self.money) + ")"
+                        if confirm == "y":
+                            self.purchase(tile)
+                    #the Property is owned by another player, and the current player has to pay rent
+                    elif tile.state == "owned":
+                        print "You landed on " + tile.properties["name"]
+                        print "This property is owned by " + self.game.players[tile.owner].name
+                        if tile.properties["set"] == "utilities":
+                            rent = total * (4 if self.game.getAmountInSet(tile.owner, "utilities") == 1 else 10)
+                        elif tile.properties["set"] == "railroads":
+                            rent = tile.properties["rent"][self.game.getAmountInSet(tile.owner, "railroads")]
+                        else:
+                            rent = tile.properties["rent"][tile.houses]
+                        print "You owe " + self.game.players[tile.owner].name + " $" + str(rent) + " in rent."
+                        print "    (" + self.game.board.getLocationName(self.position) + " currently has " + str(tile.houses) + " houses)"
+                        time.sleep(SHORT_SLEEP)
+                        self.money -= tile.properties["rent"][tile.houses]
+                        self.game.players[tile.owner].money += tile.properties["rent"][tile.houses]
+                        if self.money > 0:
+                            print "You now have $" + str(self.money)
+                        else:
+                            print "You cannot afford rent on this property."
+                    elif tile.state == "mortgaged":
+                        pass
+                elif isinstance(tile, boarddef_standard.Draw):
+                    pass
+                elif isinstance(tile, boarddef_standard.Special):
+                    if tile.properties["tax"]:
+                        print self.name + " owes the bank $" + str(tile.properties["value"]) + "."
+                        self.money -= tile.properties["value"]
+                        print self.name + " now has $" + str(self.money)
+                    elif tile.properties["name"] == "Go to prison":
+                        print self.name + " is now in prison!"
+                        self.position = 10
+                        self.inPrison = True
+            #bots are automated
+            else:
+                time.sleep(SHORT_SLEEP)
+                if isinstance(tile, boarddef_standard.Property):
+                    owner = self.game.players[tile.owner]
 
-                elif tile.state == "mortgaged":
-                    print tilename + " is owned by " + owner + ", but it is mortgaged! Nothing happens."
-            
-            elif isinstance(tile, boarddef_standard.Draw):
-                pass
-            
-            elif isinstance(tile, boarddef_standard.Special):
-                if tile.properties["tax"]:
-                    print self.name + " owes the bank $" + str(tile.properties["value"]) + "."
-                    self.money -= tile.properties["value"]
-                    print self.name + " now has $" + str(self.money)
-                elif tile.properties["name"] == "Go to prison":
-                    print self.name + " is now in prison!"
-                    self.position = 10
-                    self.inPrison = True
+                    #if this is their own property, do nothing
+                    if tile.owner == self.index:
+                        print tilename + " is already " + self.name + "'s property." 
+                        return True
 
+                    purchaseable = self.money - tile.properties["price"] > self.purchaseThreshold
+                    if tile.state == "free" and purchaseable:
+                        self.purchase(tile)
+
+                    elif tile.state == "owned":
+                        if tile.properties["set"] == "utilities":
+                            rent = total * (4 if self.game.getAmountInSet(tile.owner, "utilities") == 1 else 10)
+                        elif tile.properties["set"] == "railroads":
+                            rent = tile.properties["rent"][self.game.getAmountInSet(tile.owner, "railroads")]
+                        else:
+                            rent = tile.properties["rent"][tile.houses]
+                        self.money -= rent
+                        owner.money += rent
+                        print who + " paid $" + str(rent) + " to " + owner.name + " (Total: $" + str(self.money) + ")"
+
+                    elif tile.state == "mortgaged":
+                        print tilename + " is owned by " + owner + ", but it is mortgaged! Nothing happens."
+                
+                elif isinstance(tile, boarddef_standard.Draw):
+                    pass
+                
+                elif isinstance(tile, boarddef_standard.Special):
+                    if tile.properties["tax"]:
+                        print self.name + " owes the bank $" + str(tile.properties["value"]) + "."
+                        self.money -= tile.properties["value"]
+                        print self.name + " now has $" + str(self.money)
+                    elif tile.properties["name"] == "Go to prison":
+                        print self.name + " is now in prison!"
+                        self.position = 10
+                        self.inPrison = True
+        # the player is in prison
+        else:
+            pass
         return True
 
     def build(self):
@@ -434,15 +437,18 @@ class Player:
             clearSpace(1)
 
     def proposeDeal(self, target, theirs, ours):
-        valuation = 0
+        if self.type == "bot":
+            valuation = 0
 
-        combo = [ours, theirs]
+            combo = [ours, theirs]
 
-        for i, player in enumerate([self, target]):
-            for prop in combo[i]:
-                valuation += self.evaluate(player, prop, (True if player == target else False), combo[i])
+            for i, player in enumerate([self, target]):
+                for prop in combo[i]:
+                    valuation += self.evaluate(player, prop, (True if player == target else False), combo[i])
 
-        return valuation > 0
+            return valuation > 0
+        else: 
+            return getUserConfirm(self.name + ", do you want to accept this trade deal? [y/n]") == "y"
 
     def evaluate(self, target, prop, positive, restOfDeal):
         # get a base value (the price of the property, or the amount of money)
@@ -481,6 +487,11 @@ class Player:
         return ownedSets
 
     def bail(self):
+        if not self.inPrison:
+            print "You are not in prison! You do not need to pay bail"
+            return False
+        else:
+            pass
         return True
 
     def purchase(self, tile):
@@ -573,7 +584,7 @@ def getUserInput(string, inputtype = str):
             userinput = inputtype(userinput)
             return userinput
         except ValueError:
-            print "Please enter a valid "+ getInputType(str(inputtype)) +"!"
+            print "Please enter a valid "+ getInputType(str(inputtype)) + "!"
 
 def getUserConfirm(string):
     answer = ""
