@@ -1,4 +1,7 @@
 # CLI-Monopoly
+
+> **Please note: This project is still very much WIP. Don't expect it to work.**
+
 Monopoly in the CLI!
 
 This is the game of Monopoly in the CLI. Start the game by running monopoly.py. Easy enough!
